@@ -37,6 +37,7 @@ pipeline {
       }
       post {
         always {
+          archiveArtifacts artifacts: 'coverage/**', fingerprint: true
           publishHTML(target: [
             reportDir: 'frontend/coverage',
             reportFiles: 'index.html',

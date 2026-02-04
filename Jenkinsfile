@@ -5,6 +5,10 @@ pipeline {
     nodejs 'node18'
   }
 
+  environment {
+    N8N_WEBHOOK_URL = "https://abdo073.app.n8n.cloud/webhook-test/jenkins-status"
+  }
+
   stages {
 
     stage('Checkout Code') {
@@ -37,7 +41,7 @@ pipeline {
       }
       post {
         always {
-          archiveArtifacts artifacts: 'coverage/**', fingerprint: true
+          archiveArtifacts artifacts: 'frontend/coverage/**', fingerprint: true
           publishHTML(target: [
             reportDir: 'frontend/coverage',
             reportFiles: 'index.html',
@@ -98,25 +102,27 @@ pipeline {
 
   post {
     success {
-      emailext(
-        subject: "✅ Jenkins SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-        body: """
-          <h2>Build Success 🎉</h2>
-          <p><a href="${env.BUILD_URL}">View Build</a></p>
-        """,
-        to: 'your@email.com'
-      )
+      notifyN8N("SUCCESS", "All stages passed successfully")
     }
-
     failure {
-      emailext(
-        subject: "❌ Jenkins FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-        body: """
-          <h2>Build Failed 💥</h2>
-          <p><a href="${env.BUILD_URL}">Check Logs</a></p>
-        """,
-        to: 'your@email.com'
-      )
+      notifyN8N("FAILURE", currentBuild.currentResult)
+    }
+    aborted {
+      notifyN8N("ABORTED", "Pipeline was aborted (Quality Gate / timeout)")
     }
   }
+}
+
+def notifyN8N(status, reason) {
+  sh """
+    curl -X POST ${env.N8N_WEBHOOK_URL} \
+    -H "Content-Type: application/json" \
+    -d '{
+      "job_name": "${env.JOB_NAME}",
+      "build_number": "${env.BUILD_NUMBER}",
+      "status": "${status}",
+      "reason": "${reason}",
+      "build_url": "${env.BUILD_URL}"
+    }'
+  """
 }
